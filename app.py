@@ -1,7 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
 import json
-import graphviz
 from datetime import datetime
 
 # --- 1. CONFIGURATION & SETUP ---
@@ -152,26 +151,6 @@ def get_reflector_agent():
 
 st.title("⚡ SEYAL: The Action Agent")
 st.caption("Sequential Multi-Agent System with Context Compaction")
-
-# Architecture Visualization (Graphviz)
-with st.expander("🛠️ System Architecture (Click to View)"):
-    # Graphviz diagram to visualize the agent flow
-    graph = graphviz.Digraph(comment='SEYAL Agent Architecture', graph_attr={'rankdir': 'LR'})
-    graph.node('A', 'User', shape='circle', fillcolor='#ffcc00', style='filled')
-    graph.node('B', 'Planner', shape='box')
-    graph.node('C', 'Tasker', shape='box')
-    graph.node('D', 'Reflector', shape='box')
-    graph.node('E', 'Memory (Compaction)', shape='cylinder', fillcolor='#e0e0e0', style='filled')
-    
-    graph.edge('A', 'B', 'Goal')
-    graph.edge('B', 'E', 'Save Roadmap (Tool)')
-    graph.edge('E', 'C', 'Context')
-    graph.edge('C', 'A', 'Daily Tasks')
-    graph.edge('A', 'E', 'Log Progress')
-    graph.edge('E', 'D', 'Retrieve History (Tool)')
-    graph.edge('D', 'A', 'Insights/Report')
-    
-    st.graphviz_chart(graph)
 
 # Main Interface Tabs
 tab1, tab2, tab3 = st.tabs(["🗺️ 1. PLAN", "⚡ 2. ACTION", "🧠 3. REFLECT"])
