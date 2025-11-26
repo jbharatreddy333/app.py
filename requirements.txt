@@ -1,3 +1,4 @@
 streamlit
-google-genai
+google-generativeai
 graphviz
+python-dateutil
