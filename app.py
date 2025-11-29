@@ -97,14 +97,28 @@ class SeyalMemoryBank:
             st.session_state["logs"] = recent_logs
             st.toast("Old memories compressed into Long-Term Storage.")
 
-    # --- Tool: Retrieve History (Used by Reflection Agent) ---
-    def retrieve_history_tool(self):
-        """Returns the 'Smart Context' for Reflection (Function Calling Tool)."""
-        return json.dumps({
-            "current_plan": st.session_state["roadmap"],
-            "long_term_history": st.session_state["long_term_summary"],
-            "recent_daily_logs": st.session_state["logs"]
-        })
+    # --- Get history as string (not a tool, just a helper) ---
+    def get_history_context(self):
+        """Returns formatted history context as a string."""
+        context = f"""
+# USER PROGRESS CONTEXT
+
+## Current Plan (Milestones):
+{json.dumps(st.session_state["roadmap"], indent=2)}
+
+## Long-Term History Summary:
+{st.session_state["long_term_summary"]}
+
+## Recent Daily Logs (Last 3-5 Days):
+"""
+        for log in st.session_state["logs"]:
+            context += f"\n### {log['date']} - Mood: {log['mood']}"
+            context += f"\nUpdate: {log['update']}"
+            if log.get('completed_tasks'):
+                context += f"\nCompleted Tasks: {', '.join(log['completed_tasks'])}"
+            context += "\n"
+        
+        return context
 
 memory = SeyalMemoryBank()
 
@@ -138,16 +152,25 @@ def get_task_agent():
         system_instruction=system_instruction
     )
 
-@st.cache_resource
 def get_reflector_agent():
+    """Create reflector agent without function calling - uses direct context instead"""
     system_instruction = """
-    You are the SEYAL Insight Agent. Goal: Analyze user progress.
-    Action: Call `retrieve_history_tool` to see past context.
-    Output: A Weekly Report with 1. 🏆 Wins, 2. ⚠️ Patterns Detected, 3. 🚀 Next Focus.
+    You are the SEYAL Insight Agent. Goal: Analyze user progress including completed tasks.
+    
+    You will be provided with the user's full history context including:
+    - Their current plan/milestones
+    - Long-term summary of past progress
+    - Recent daily logs with completed tasks and mood
+    
+    Output: A Weekly Report with:
+    1. 🏆 Wins (specific tasks completed - be detailed!)
+    2. ⚠️ Patterns Detected (mood trends, consistency, challenges)
+    3. 🚀 Next Focus (what to prioritize based on the plan)
+    
+    Be specific about completed tasks and celebrate progress!
     """
     return genai.GenerativeModel(
         model_name='gemini-2.5-pro',
-        tools=[memory.retrieve_history_tool],
         system_instruction=system_instruction
     )
 
@@ -264,7 +287,18 @@ with tab2:
 # --- TAB 3: REFLECT ---
 with tab3:
     st.subheader("Weekly Insights")
-    st.info("The Reflector Agent uses your **long-term summary** to find valuable patterns.")
+    st.info("The Reflector Agent uses your **long-term summary** and **completed tasks** to find valuable patterns.")
+    
+    # Show what data is available
+    total_logs = len(st.session_state["logs"])
+    total_completed = sum(len(log.get("completed_tasks", [])) for log in st.session_state["logs"])
+    
+    if total_logs > 0:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Days Logged", total_logs)
+        with col2:
+            st.metric("Total Tasks Completed", total_completed)
     
     if st.button("Analyze My Progress"):
         if len(st.session_state["logs"]) == 0 and "User started" in st.session_state["long_term_summary"]:
@@ -273,11 +307,28 @@ with tab3:
             with st.spinner("Reflector Agent is analyzing memory and generating report..."):
                 try:
                     reflector = get_reflector_agent()
-                    chat = reflector.start_chat(enable_automatic_function_calling=True)
-                    response = chat.send_message("Generate my SEYAL Report now.")
+                    
+                    # Get the formatted history context
+                    history_context = memory.get_history_context()
+                    
+                    # Send directly as a message instead of using function calling
+                    prompt = f"""Analyze this user's progress and generate a SEYAL Weekly Report.
+
+{history_context}
+
+Please provide:
+1. 🏆 Wins - Specific tasks they completed and achievements
+2. ⚠️ Patterns Detected - Mood trends, consistency, any challenges
+3. 🚀 Next Focus - What should they prioritize based on their plan
+
+Be encouraging and specific!"""
+                    
+                    response = reflector.generate_content(prompt)
                     st.markdown(response.text)
+                    
                 except Exception as e:
                     st.error(f"Error generating reflection: {e}")
+                    st.exception(e)  # Show full traceback for debugging
 
 # --- DEBUG VIEW (Optional but useful for judges) ---
 with st.expander("🔍 Internals (Memory State and Observability)"):
