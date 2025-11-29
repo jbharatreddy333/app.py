@@ -100,23 +100,40 @@ class SeyalMemoryBank:
     # --- Get history as string (not a tool, just a helper) ---
     def get_history_context(self):
         """Returns formatted history context as a string."""
+        # Safely format roadmap
+        roadmap_text = ""
+        if st.session_state["roadmap"]:
+            for i, milestone in enumerate(st.session_state["roadmap"], 1):
+                roadmap_text += f"\n  {i}. {str(milestone)}"
+        else:
+            roadmap_text = "\n  No roadmap created yet."
+        
         context = f"""
 # USER PROGRESS CONTEXT
 
-## Current Plan (Milestones):
-{json.dumps(st.session_state["roadmap"], indent=2)}
+## Current Plan (Milestones):{roadmap_text}
 
 ## Long-Term History Summary:
 {st.session_state["long_term_summary"]}
 
-## Recent Daily Logs (Last 3-5 Days):
+## Recent Daily Logs (Day-by-Day Analysis):
 """
-        for log in st.session_state["logs"]:
-            context += f"\n### {log['date']} - Mood: {log['mood']}"
-            context += f"\nUpdate: {log['update']}"
-            if log.get('completed_tasks'):
-                context += f"\nCompleted Tasks: {', '.join(log['completed_tasks'])}"
-            context += "\n"
+        if not st.session_state["logs"]:
+            context += "\nNo logs recorded yet."
+        else:
+            for i, log in enumerate(st.session_state["logs"], 1):
+                context += f"\n### Day {i}: {log.get('date', 'Unknown date')}"
+                context += f"\n**Mood**: {log.get('mood', 'Not specified')}"
+                context += f"\n**Progress Update**: {log.get('update', 'No update')}"
+                
+                completed = log.get('completed_tasks', [])
+                if completed:
+                    context += f"\n**✅ Tasks Completed** ({len(completed)}):"
+                    for task in completed:
+                        context += f"\n  • {str(task)}"
+                else:
+                    context += "\n**Tasks Completed**: None recorded"
+                context += "\n"
         
         return context
 
@@ -153,21 +170,36 @@ def get_task_agent():
     )
 
 def get_reflector_agent():
-    """Create reflector agent without function calling - uses direct context instead"""
+    """Create reflector agent for day-by-day progress analysis"""
     system_instruction = """
-    You are the SEYAL Insight Agent. Goal: Analyze user progress including completed tasks.
+    You are the SEYAL Insight Agent - an expert at analyzing daily progress patterns.
     
-    You will be provided with the user's full history context including:
-    - Their current plan/milestones
-    - Long-term summary of past progress
-    - Recent daily logs with completed tasks and mood
+    You will receive the user's day-by-day logs including:
+    - What they accomplished each day
+    - Which specific tasks they completed
+    - Their mood each day
+    - Their overall plan and milestones
     
-    Output: A Weekly Report with:
-    1. 🏆 Wins (specific tasks completed - be detailed!)
-    2. ⚠️ Patterns Detected (mood trends, consistency, challenges)
-    3. 🚀 Next Focus (what to prioritize based on the plan)
+    Your job is to provide a detailed Weekly Report with:
     
-    Be specific about completed tasks and celebrate progress!
+    1. 🏆 **Daily Wins Recap**
+       - Summarize what they accomplished each day
+       - Highlight specific tasks completed
+       - Celebrate their consistency and progress
+    
+    2. ⚠️ **Patterns & Insights Detected**
+       - Mood trends across days (energy levels, motivation patterns)
+       - Consistency in task completion
+       - Which days were most productive and why
+       - Any challenges or obstacles that appeared
+    
+    3. 🚀 **Strategic Next Steps**
+       - What to focus on tomorrow/next week
+       - Based on their plan, what's the next milestone
+       - Suggestions to maintain momentum
+    
+    Be specific, encouraging, and data-driven. Reference actual tasks completed and specific days.
+    Make the user feel proud of their progress while giving actionable insights!
     """
     return genai.GenerativeModel(
         model_name='gemini-2.5-pro',
@@ -286,49 +318,88 @@ with tab2:
 
 # --- TAB 3: REFLECT ---
 with tab3:
-    st.subheader("Weekly Insights")
-    st.info("The Reflector Agent uses your **long-term summary** and **completed tasks** to find valuable patterns.")
+    st.subheader("📊 Day-by-Day Progress Analysis")
+    st.info("The Reflector Agent analyzes your **daily tasks, mood patterns, and progress** to provide actionable insights.")
     
     # Show what data is available
     total_logs = len(st.session_state["logs"])
     total_completed = sum(len(log.get("completed_tasks", [])) for log in st.session_state["logs"])
     
     if total_logs > 0:
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Days Logged", total_logs)
+            st.metric("📅 Days Logged", total_logs)
         with col2:
-            st.metric("Total Tasks Completed", total_completed)
+            st.metric("✅ Tasks Completed", total_completed)
+        with col3:
+            avg_tasks = total_completed / total_logs if total_logs > 0 else 0
+            st.metric("📈 Avg Tasks/Day", f"{avg_tasks:.1f}")
+        
+        # Show recent activity preview
+        with st.expander("📋 Recent Activity Preview"):
+            for log in st.session_state["logs"][-3:]:  # Last 3 days
+                st.markdown(f"**{log.get('date')}** - Mood: {log.get('mood')}")
+                completed = log.get('completed_tasks', [])
+                if completed:
+                    st.markdown(f"✅ Completed: {len(completed)} task(s)")
+                else:
+                    st.markdown("⚠️ No tasks marked complete")
     
-    if st.button("Analyze My Progress"):
+    if st.button("🧠 Analyze My Progress", type="primary"):
         if len(st.session_state["logs"]) == 0 and "User started" in st.session_state["long_term_summary"]:
-            st.warning("Not enough data yet. Log a few days of actions before reflecting!")
+            st.warning("📝 Not enough data yet. Log at least one day of progress before getting insights!")
         else:
-            with st.spinner("Reflector Agent is analyzing memory and generating report..."):
+            with st.spinner("🔍 Reflector Agent is analyzing your day-by-day progress..."):
                 try:
                     reflector = get_reflector_agent()
                     
                     # Get the formatted history context
                     history_context = memory.get_history_context()
                     
-                    # Send directly as a message instead of using function calling
-                    prompt = f"""Analyze this user's progress and generate a SEYAL Weekly Report.
+                    # Send directly as a message
+                    prompt = f"""Analyze this user's day-by-day progress and generate a comprehensive SEYAL Weekly Report.
 
 {history_context}
 
-Please provide:
-1. 🏆 Wins - Specific tasks they completed and achievements
-2. ⚠️ Patterns Detected - Mood trends, consistency, any challenges
-3. 🚀 Next Focus - What should they prioritize based on their plan
+Please provide a detailed analysis with:
 
-Be encouraging and specific!"""
+1. 🏆 **Daily Wins Recap**
+   - Go through each day and summarize what they accomplished
+   - Mention specific tasks completed
+   - Celebrate their progress
+
+2. ⚠️ **Patterns & Insights Detected**
+   - How did their mood change day to day?
+   - Which days were most productive?
+   - Any concerning patterns or obstacles?
+   - Consistency in showing up?
+
+3. 🚀 **Strategic Next Steps**
+   - Based on their plan, what should they focus on next?
+   - How can they maintain or improve momentum?
+   - Specific actionable recommendations
+
+Be encouraging, specific, and reference actual days and tasks!"""
                     
                     response = reflector.generate_content(prompt)
+                    
+                    st.markdown("---")
+                    st.markdown("### 📊 Your SEYAL Progress Report")
                     st.markdown(response.text)
                     
                 except Exception as e:
-                    st.error(f"Error generating reflection: {e}")
-                    st.exception(e)  # Show full traceback for debugging
+                    st.error(f"❌ Error generating reflection: {str(e)}")
+                    with st.expander("🔍 Debug Information"):
+                        st.exception(e)
+                        st.write("**Session State:**")
+                        st.json({
+                            "roadmap": [str(m) for m in st.session_state.get("roadmap", [])],
+                            "logs_count": len(st.session_state.get("logs", [])),
+                            "tasks_count": len(st.session_state.get("tasks", []))
+                        })
+    
+    elif total_logs == 0:
+        st.info("👋 Get started by creating a plan in the PLAN tab, then log your daily progress in the ACTION tab. Come back here to get insights!")
 
 # --- DEBUG VIEW (Optional but useful for judges) ---
 with st.expander("🔍 Internals (Memory State and Observability)"):
