@@ -54,7 +54,9 @@ class SeyalMemoryBank:
         if "long_term_summary" not in st.session_state:
             st.session_state["long_term_summary"] = "User started SEYAL journey."
         if "tasks" not in st.session_state:
-            st.session_state["tasks"] = "No tasks generated yet. Please generate a plan first."
+            st.session_state["tasks"] = []
+        if "task_status" not in st.session_state:
+            st.session_state["task_status"] = {}
 
     # --- Tool: Update Roadmap (Used by Planner Agent) ---
     def update_roadmap(self, milestones: list):
@@ -63,12 +65,13 @@ class SeyalMemoryBank:
         return "✅ Roadmap saved to memory."
 
     # --- Tool: Log Daily Update (Called directly from UI) ---
-    def log_daily_update(self, update_text: str, mood: str):
+    def log_daily_update(self, update_text: str, mood: str, completed_tasks: list):
         """Logs a new daily entry and triggers compaction if necessary."""
         entry = {
             "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "update": update_text,
-            "mood": mood
+            "mood": mood,
+            "completed_tasks": completed_tasks
         }
         st.session_state["logs"].append(entry)
         
@@ -126,7 +129,9 @@ def get_planner_agent():
 def get_task_agent():
     system_instruction = """
     You are the SEYAL Task Manager. Goal: Take the current plan and generate ONE day's worth of micro-tasks (3-4 items)
-    for the next milestone. Format: Use Markdown Checkboxes (e.g., - [ ] Task).
+    for the next milestone. 
+    IMPORTANT: Return ONLY a JSON array of task strings. Example: ["Task 1", "Task 2", "Task 3"]
+    Do NOT include markdown, checkboxes, or any other formatting.
     """
     return genai.GenerativeModel(
         model_name='gemini-2.5-flash',
@@ -190,26 +195,71 @@ with tab2:
         st.markdown("### 📋 Daily Tasks")
         if st.button("Get Today's Tasks"):
             with st.spinner("Task Agent is breaking down the plan..."):
-                task_agent = get_task_agent()
-                context = f"Current Plan: {st.session_state['roadmap']}. Long-Term Summary: {st.session_state['long_term_summary']}"
-                response = task_agent.generate_content(f"{context}. Generate detailed, executable tasks for today based on the next milestone in the plan.")
-                st.session_state["tasks"] = response.text
+                try:
+                    task_agent = get_task_agent()
+                    context = f"Current Plan: {st.session_state['roadmap']}. Long-Term Summary: {st.session_state['long_term_summary']}"
+                    response = task_agent.generate_content(f"{context}. Generate detailed, executable tasks for today based on the next milestone in the plan.")
+                    
+                    # Parse the JSON response
+                    response_text = response.text.strip()
+                    # Remove markdown code blocks if present
+                    if response_text.startswith("```"):
+                        response_text = response_text.split("```")[1]
+                        if response_text.startswith("json"):
+                            response_text = response_text[4:]
+                    
+                    tasks = json.loads(response_text)
+                    st.session_state["tasks"] = tasks
+                    
+                    # Initialize task status
+                    for i, task in enumerate(tasks):
+                        if f"task_{i}" not in st.session_state["task_status"]:
+                            st.session_state["task_status"][f"task_{i}"] = False
+                    
+                    st.success("Tasks generated!")
+                except Exception as e:
+                    st.error(f"Error generating tasks: {e}")
+                    # Fallback to text display
+                    st.session_state["tasks"] = [response.text]
         
-        st.markdown(st.session_state["tasks"])
+        # Display tasks with checkboxes
+        if st.session_state["tasks"]:
+            st.markdown("**Today's Tasks:**")
+            for i, task in enumerate(st.session_state["tasks"]):
+                task_key = f"task_{i}"
+                # Initialize if not exists
+                if task_key not in st.session_state["task_status"]:
+                    st.session_state["task_status"][task_key] = False
+                
+                # Display checkbox
+                is_checked = st.checkbox(task, key=task_key, value=st.session_state["task_status"][task_key])
+                st.session_state["task_status"][task_key] = is_checked
 
     # Right: Logging
     with col2:
         st.markdown("### 📝 Log Progress")
-        log_input = st.text_area("What did you complete and what challenges did you face?", key="log_input")
+        log_input = st.text_area("What did you complete and what challenges did you face?", 
+                                 key="daily_log_text",
+                                 height=150)
         mood_input = st.select_slider("Mood", ["Drained", "Bored", "Neutral", "Good", "Energetic"])
         
         if st.button("Log Update"):
             if not log_input:
                 st.warning("Please enter your daily progress.")
             else:
-                msg = memory.log_daily_update(log_input, mood_input)
+                # Get completed tasks
+                completed_tasks = [
+                    st.session_state["tasks"][i] 
+                    for i in range(len(st.session_state["tasks"])) 
+                    if st.session_state["task_status"].get(f"task_{i}", False)
+                ]
+                
+                msg = memory.log_daily_update(log_input, mood_input, completed_tasks)
                 st.success(msg)
-                st.session_state.log_input = "" # Clear input
+                
+                # Show completion summary
+                if completed_tasks:
+                    st.info(f"✅ Logged {len(completed_tasks)} completed task(s)")
 
 # --- TAB 3: REFLECT ---
 with tab3:
@@ -221,15 +271,20 @@ with tab3:
             st.warning("Not enough data yet. Log a few days of actions before reflecting!")
         else:
             with st.spinner("Reflector Agent is analyzing memory and generating report..."):
-                reflector = get_reflector_agent()
-                chat = reflector.start_chat(enable_automatic_function_calling=True)
-                response = chat.send_message("Generate my SEYAL Report now.")
-                st.markdown(response.text)
+                try:
+                    reflector = get_reflector_agent()
+                    chat = reflector.start_chat(enable_automatic_function_calling=True)
+                    response = chat.send_message("Generate my SEYAL Report now.")
+                    st.markdown(response.text)
+                except Exception as e:
+                    st.error(f"Error generating reflection: {e}")
 
 # --- DEBUG VIEW (Optional but useful for judges) ---
 with st.expander("🔍 Internals (Memory State and Observability)"):
     st.json({
         "Roadmap": st.session_state["roadmap"],
+        "Current Tasks": st.session_state["tasks"],
+        "Task Completion Status": st.session_state["task_status"],
         "Recent Detailed Logs (Last 3-5 days)": st.session_state["logs"],
         "Long Term Memory Summary (Compacted History)": st.session_state["long_term_summary"]
     })
