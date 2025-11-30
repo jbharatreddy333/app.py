@@ -410,3 +410,4 @@ with st.expander("🔍 Internals (Memory State and Observability)"):
         "Recent Detailed Logs (Last 3-5 days)": st.session_state["logs"],
         "Long Term Memory Summary (Compacted History)": st.session_state["long_term_summary"]
     })
+
