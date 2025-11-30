@@ -6,287 +6,180 @@ which are tied together by a lightweight implicit orchestrator, implemented thro
 
 
 
+## 🔧 SEYAL — Architecture & Setup Guide
 
-1. Interface Layer (Streamlit App)
+SEYAL is a **single-model, multi-agent execution system** built entirely on top of **Google Gemini** and **Streamlit**. Even though only one LLM model is used, SEYAL forms a coordinated ecosystem of intelligent agents—each with its own responsibilities, tools, and memory system. Together, they help convert **goals → daily actions → meaningful insights**.
 
-SEYAL uses a modular three-tab UI that naturally maps the execution loop:
+---
 
-PLAN Tab → captures the user’s goal and triggers the Planner Agent.
+## 🧩 System Architecture
 
-ACTION Tab → shows daily tasks, tracks completion checkboxes, and logs daily updates.
+SEYAL operates through **four tightly-integrated layers**, connected by Streamlit’s event-driven workflow:
 
-REFLECT Tab → triggers the Insight Agent to analyze behavior, tasks, and moods.
+```
+Interface Layer → Agent Layer → Tooling Layer → Memory Layer
+```
 
+### 1️⃣ Interface Layer — Streamlit App
 
-The interface is reactive, meaning user interactions automatically trigger the right agents with the right context without requiring an explicit orchestration layer.
+A clean, three-tab UI driving the execution loop:
 
+| Tab         | Purpose                             | Triggered Agent |
+| ----------- | ----------------------------------- | --------------- |
+| **PLAN**    | Capture goal & generate roadmap     | Planner Agent   |
+| **ACTION**  | Show daily tasks & log progress     | Task Agent      |
+| **REFLECT** | Weekly-style insights & mood trends | Insight Agent   |
 
-2. Agent Layer (LLM Roles using Gemini)
+The UI is **reactive**, meaning user actions automatically call the right agent with the right context—**no explicit orchestrator needed**.
 
-Although SEYAL uses only one Gemini model, three distinct agent personas are formed:
+---
 
-🧭 Planner Agent
+### 2️⃣ Agent Layer — Multi-Agent Roles (Powered by Gemini)
 
-Breaks user goals into four structured milestones.
+Although only one LLM model is used, SEYAL creates three agent personas—each with unique system prompts & tool access:
 
-Write the finalized roadmap to memory using the update_roadmap tool.
+| Agent                | Role                                             | Model Used       |
+| -------------------- | ------------------------------------------------ | ---------------- |
+| 🧭 **Planner Agent** | Breaks goals into 4 milestones & stores roadmap  | gemini-2.5-flash |
+| 📋 **Task Agent**    | Generates 3–4 achievable micro-tasks for the day | gemini-2.5-flash |
+| 🧠 **Insight Agent** | Behavioral + performance analysis across time    | gemini-2.5-pro   |
 
-Uses gemini-2.5-flash for fast reasoning.
+Each agent exists as a **separate GenerativeModel instance**, transforming a single LLM into a **multi-agent execution system**.
 
+---
 
-📋 Task Agent
+### 3️⃣ Tooling Layer — Function Calling
 
-Takes milestones + long-term summary and generates 3–4 micro tasks for the day.
+SEYAL integrates tools via Gemini’s function-calling:
 
-Returns tasks in pure JSON, ensuring they can be programmatically consumed.
+| Tool                      | Used By       | Purpose                     |
+| ------------------------- | ------------- | --------------------------- |
+| 🔧 `update_roadmap`       | Planner Agent | Store milestone-based plans |
+| 📝 Log Store (MemoryBank) | Task Agent    | Save tasks, logs & mood     |
 
-Also runs on gemini-2.5-flash.
+These tools ensure SEYAL **acts**, not just generates text.
 
+---
 
-🧠 Insight Agent
+### 4️⃣ Memory Layer — State + Context Compaction
 
-Performs deep behavioral analysis over:
+A hybrid memory system built around Streamlit’s `session_state`:
 
-Daily logs
+| Memory Type               | Stores                     |
+| ------------------------- | -------------------------- |
+| **Roadmap Memory**        | 4 structured milestones    |
+| **Short-Term Log Memory** | Detailed last 5 logs       |
+| **Long-Term Summary**     | Auto-summarized older logs |
 
-Mood patterns
+When logs exceed 5 entries → **LLM compacts context** and preserves continuity.
 
-Completed tasks
+---
 
-Overall plan
+## 🔄 Implicit Orchestrator — Lightweight Workflow Control
 
-Long-term summary
+Instead of explicit orchestration:
 
+* Tabs guide context flow
+* Tools update memory
+* Session state stores progress
+* Agents read/write just-in-time information
 
-Produces a detailed weekly-style progress report.
+Result → a **smooth end-to-end goal execution loop**.
 
-Uses gemini-2.5-pro for richer reasoning quality.
+---
 
+## 🚀 Setup Instructions
 
-Each agent exists as a separate GenerativeModel instance with unique system prompts and optional tools, turning a single model into a multi-agent ecosystem.
+Follow the steps to run **SEYAL: AI Action Companion** locally 👇
 
+### 1️⃣ Clone the Repository
 
-
-3. Tooling Layer (Function Calling)
-
-SEYAL integrates custom tools using Gemini’s function calling mechanism.
-Right now, two tools form the backbone of the system:
-
-🔧 Roadmap Tool
-
-update_roadmap(milestones: list)
-Stores milestone structures into Streamlit session memory.
-
-Used exclusively by the Planner Agent.
-
-📝 Log Store Tool
-
-Part of the SeyalMemoryBank, this tool:
-
-Saves daily updates
-
-Tracks completed tasks
-
-Records mood
-
-Triggers context compaction when logs grow too large
-
-
-These tools ensure the system behaves like a true execution engine instead of just a chain of text prompts.
-
-
-
-4. Memory Layer (State + Context Compaction)
-
-SEYAL uses a hybrid memory system built around Streamlit’s session_state, enhanced with context compaction to maintain long-term continuity.
-
-Memory has three parts:
-
-1. Roadmap Memory
-
-Stores the user’s milestone plan.
-
-2. Short-Term Log Memory
-
-Stores recent detailed daily logs:
-
-User text updates
-
-Mood
-
-Completed tasks
-
-Timestamp
-
-
-3. Long-Term Summary Memory
-
-Older logs are automatically compressed using the LLM:
-
-When logs exceed 5 entries
-
-The oldest logs are summarized by Gemini into a compact narrative
-
-The summary is appended to long-term memory
-
-Only recent logs remain detailed
-
-
-
-5. Implicit Orchestrator (Workflow Control)
-
-SEYAL does not use an explicit agent coordinator file.
-Instead, the orchestration emerges naturally from:
-
-Streamlit’s tab flow
-
-State stored in session_state
-
-Tools binding
-
-Back-and-forth message passing
-
-
-Here's how the orchestration looks under the hood:
-
-1. User enters a goal → Planner Agent → roadmap saved via tool
-
-
-2. User moves to ACTION tab → Task Agent reads memory → returns today’s tasks
-
-
-3. User checks boxes + logs update → MemoryBank stores log → may compact context
-
-
-4. User moves to REFLECT tab → Insight Agent reads:
-
-Roadmap
-
-Long-term summary
-
-Recent detailed logs.
-
-5. Insight Agent returns a weekly-style analysis
-
-
-
-# Instructions for Setup 
-
-Here is a clean, polished, GitHub-ready Setup Instructions section you can paste directly into your README.md:
-
-
-
-🛠️ Setup Instructions
-
-Follow the steps below to run SEYAL: AI Action Companion locally on your system.
-
-
-
-1️⃣ Clone the Repository
-
+```bash
 git clone https://github.com/your-username/your-repo-name.git
 cd your-repo-name
+```
 
+### 2️⃣ Create a Virtual Environment
 
+**macOS / Linux**
 
-2️⃣ Create a Virtual Environment
-
-macOS / Linux
-
+```bash
 python3 -m venv venv
 source venv/bin/activate
+```
 
-Windows (PowerShell)
+**Windows (PowerShell)**
 
+```bash
 python -m venv venv
 .\venv\Scripts\Activate.ps1
+```
 
+### 3️⃣ Install Dependencies
 
-
-3️⃣ Install Dependencies
-
-If the repo includes requirements.txt:
-
+```bash
 pip install -r requirements.txt
+```
 
-Otherwise:
+Or, if not included:
 
+```bash
 pip install streamlit google-generative-ai
+```
 
+### 4️⃣ Add Your Gemini API Key *(Required)*
 
-
-4️⃣ Add Your Gemini API Key (Required)
-
-Recommended Method — Using Streamlit Secrets
-
+📌 Recommended — **Streamlit Secrets**
 Create:
 
+```
 .streamlit/secrets.toml
+```
 
 Add:
 
+```toml
 GEMINI_API_KEY = "your_gemini_api_key_here"
+```
 
-⚠️ Important: Add .streamlit/secrets.toml to .gitignore so you don’t expose your API key.
+⚠️ Make sure `.streamlit/secrets.toml` is added to `.gitignore`
 
+---
 
-Alternative Method — Environment Variable
+Alternative — **Environment Variable**
 
-macOS / Linux
+| OS            | Command                            |
+| ------------- | ---------------------------------- |
+| macOS / Linux | `export GEMINI_API_KEY="your_key"` |
+| Windows       | `setx GEMINI_API_KEY "your_key"`   |
 
-export GEMINI_API_KEY="your_gemini_api_key_here"
+---
 
-Windows (PowerShell)
+Last-Resort — **Enter manually in Streamlit Sidebar**
 
-setx GEMINI_API_KEY "your_gemini_api_key_here"
+---
 
+### 5️⃣ Run the App
 
-Last-Resort Method — Entering in Sidebar
-
-If no key is found, the app allows entering the API key manually in the Streamlit sidebar.
-
-
-5️⃣ Run the Application
-
+```bash
 streamlit run app.py
+```
 
-Streamlit will open automatically, or you can visit:
+Then open:
 
+```
 http://localhost:8501
+```
 
+---
 
-6️⃣ Using the App
+## 🎯 How to Use SEYAL
 
-PLAN
+| Step            | Tab     | What Happens                   |
+| --------------- | ------- | ------------------------------ |
+| 1️⃣ Set a goal  | PLAN    | Planner Agent builds roadmap   |
+| 2️⃣ Take action | ACTION  | Daily tasks + progress logging |
+| 3️⃣ Reflect     | REFLECT | Insight Agent generates report |
 
-Enter your goal
+Consistent usage = **better insights + smarter planning** 📈
 
-Click Generate Roadmap
-
-The Planner agent creates 4 milestones and stores them in memory
-
-
-ACTION
-
-Click Get Today's Tasks
-
-Complete tasks using checkboxes
-
-Log your progress and mood
-
-The Memory System auto-compacts older logs into summaries
-
-
-REFLECT
-
-Click Analyze My Progress
-
-The Insight Agent generates a detailed weekly-style progress report
-
-
-
-7️⃣ (Optional) Update Dependencies
-
-If you modify or upgrade packages:
-
-pip freeze > requirements.txt
