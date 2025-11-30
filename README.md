@@ -1,11 +1,5 @@
 SEYAL is built as a single-model, multi-agent execution system that runs entirely on top of Google Gemini and Streamlit. Even though only one LLM model is used, SEYAL creates separate “agents” by assigning each one a unique system instruction, tools, and responsibilities. Together, they form a coordinated pipeline that transforms goals into actions, logs progress, and produces insight reports.
 
-The architecture is structured around four core layers:
-Interface Layer → Agent Layer → Tooling Layer → Memory Layer
-which are tied together by a lightweight implicit orchestrator, implemented through Streamlit’s event-driven workflow.
-
-
-
 ## 🔧 SEYAL — Architecture & Setup Guide
 
 SEYAL is a **single-model, multi-agent execution system** built entirely on top of **Google Gemini** and **Streamlit**. Even though only one LLM model is used, SEYAL forms a coordinated ecosystem of intelligent agents—each with its own responsibilities, tools, and memory system. Together, they help convert **goals → daily actions → meaningful insights**.
