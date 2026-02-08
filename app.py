@@ -5,6 +5,20 @@ from datetime import datetime
 import streamlit as st
 import streamlit.components.v1 as components
 
+# 1. Set the page title and the logo as the browser favicon
+st.set_page_config(
+    page_title="Seyal",
+    page_icon="logo.jpg",  # This uses your logo.jpg file
+    layout="centered"
+)
+
+# 2. Display the logo at the top of the app or in the sidebar
+st.sidebar.image("logo.jpg", width=150)
+st.sidebar.title("Seyal")
+
+# --- Your existing PWA Injector Code ---
+# (Ensure the links here also point to your main branch Raw URLs)
+
 # --- PWA INJECTION CODE ---
 def inject_pwa():
     pwa_code = """
@@ -437,5 +451,6 @@ with st.expander("🔍 Internals (Memory State and Observability)"):
         "Recent Detailed Logs (Last 3-5 days)": st.session_state["logs"],
         "Long Term Memory Summary (Compacted History)": st.session_state["long_term_summary"]
     })
+
 
 
