@@ -2,10 +2,12 @@ streamlit
 google-generativeai
 graphviz
 python-dateutil
-streamlit>=1.28.0
 google-generativeai>=0.3.0
 audio-recorder-streamlit>=0.0.8
 SpeechRecognition>=3.10.0
 gTTS>=2.4.0
 pyaudio>=0.2.13
+streamlit>=1.28.0
+pydub>=0.25.1
+
 
