@@ -2,6 +2,33 @@ import streamlit as st
 import google.generativeai as genai
 import json
 from datetime import datetime
+import streamlit as st
+import streamlit.components.v1 as components
+
+# --- PWA INJECTION CODE ---
+def inject_pwa():
+    pwa_code = """
+    <link rel="manifest" href="https://raw.githubusercontent.com/jbharatreddy333/app.py/main/manifest.json">
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('https://raw.githubusercontent.com/jbharatreddy333/app.py/main/sw.js').then(function(registration) {
+            console.log('ServiceWorker registration successful');
+          }, function(err) {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+        });
+      }
+    </script>
+    """
+    # This injects the code into the app's HTML head
+    components.html(pwa_code, height=0)
+
+inject_pwa()
+# --- END PWA INJECTION ---
+
+st.title("Seyal: Your Action Partner")
+# ... your existing Gemini/Streamlit code ...
 
 # --- 1. CONFIGURATION & SETUP ---
 
@@ -410,4 +437,5 @@ with st.expander("🔍 Internals (Memory State and Observability)"):
         "Recent Detailed Logs (Last 3-5 days)": st.session_state["logs"],
         "Long Term Memory Summary (Compacted History)": st.session_state["long_term_summary"]
     })
+
 
