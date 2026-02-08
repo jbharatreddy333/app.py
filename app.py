@@ -7,7 +7,7 @@ import streamlit.components.v1 as components
 # 1. Set the page title and the logo as the browser favicon
 st.set_page_config(
     page_title="Seyal",
-    page_icon="logo.jpg",  # This uses your logo.jpg file
+    page_icon="⚡",  # Using emoji as fallback if logo.jpg missing
     layout="wide"
 )
 
@@ -15,7 +15,7 @@ st.set_page_config(
 try:
     st.sidebar.image("logo.jpg", width=150)
 except:
-    pass  # Logo file optional
+    st.sidebar.markdown("# ⚡")
 st.sidebar.title("Seyal")
 
 # --- PWA INJECTION CODE ---
@@ -41,17 +41,22 @@ inject_pwa()
 # --- 1. CONFIGURATION & SETUP ---
 
 # Secure API Key Retrieval
-api_key = st.secrets.get("GEMINI_API_KEY")
+api_key = st.secrets.get("GEMINI_API_KEY") if hasattr(st, 'secrets') else None
 
 if not api_key:
     api_key = st.sidebar.text_input("Enter Google Gemini API Key", type="password")
     
 if not api_key:
     st.warning("⚠️ Please provide a Google Gemini API Key to run the agents.")
+    st.info("💡 Get your free API key at: https://makersuite.google.com/app/apikey")
     st.stop()
 
 # Initialize the Gemini Client
-genai.configure(api_key=api_key)
+try:
+    genai.configure(api_key=api_key)
+except Exception as e:
+    st.error(f"Error configuring API: {e}")
+    st.stop()
 
 
 # --- 2. ADVANCED MEMORY SYSTEM (Context Compaction) ---
@@ -97,6 +102,8 @@ class SeyalMemoryBank:
             st.session_state["conversation_history"] = []
         if "pending_tasks" not in st.session_state:
             st.session_state["pending_tasks"] = []
+        if "chat_messages" not in st.session_state:
+            st.session_state["chat_messages"] = []
 
     def update_roadmap(self, milestones: list):
         """Saves the high-level milestones to memory (Function Calling Tool)."""
@@ -256,6 +263,7 @@ def get_planner_agent():
     You are the SEYAL Planner. Goal: Break a user's objective into 4 clear, sequential milestones.
     Action: You MUST use the `update_roadmap` tool to save them.
     Response: A brief, encouraging confirmation that references their "why" if provided.
+    Keep your response conversational, warm, and motivating like a supportive coach.
     """
     return genai.GenerativeModel(
         model_name='gemini-2.0-flash-exp',
@@ -310,6 +318,7 @@ def get_reflector_agent():
     
     Be specific, encouraging, and data-driven. Reference actual tasks completed and specific days.
     Make the user feel proud of their progress while giving actionable insights!
+    Write in a warm, conversational tone like a supportive friend.
     """
     return genai.GenerativeModel(
         model_name='gemini-2.0-flash-exp',
@@ -319,34 +328,43 @@ def get_reflector_agent():
 def get_conversation_agent():
     """Create conversational agent for morning/evening rituals."""
     system_instruction = """
-    You are SEYAL's conversational interface. You help users through friendly dialogue.
+    You are SEYAL - a warm, supportive AI companion who helps people achieve their goals.
+    
+    PERSONALITY:
+    - Speak like a trusted friend who genuinely cares
+    - Be encouraging but honest
+    - Use "we" language (we're in this together)
+    - Keep responses SHORT - 2-3 sentences max unless asked for more
+    - Use casual, natural language
+    - Sprinkle in emojis naturally (not excessively)
+    - Ask ONE question at a time
+    - Remember their "why" and reference it when they need motivation
     
     MORNING BRIEFING:
-    - Review their plan for the day in a warm, encouraging way
+    - Greet them warmly
+    - Review today's tasks in an energizing way
     - Ask which task is their "frog" (hardest/most important to do first)
-    - Suggest a realistic order based on their energy patterns from logs
-    - Keep it under 3 conversational exchanges
-    - Reference their "why" to motivate them
+    - Based on past logs, suggest a realistic order
+    - Connect to their bigger "why" for motivation
+    - Keep it brief - 3-4 conversational turns max
     
     EVENING REFLECTION:
     - Celebrate what got done (be specific about tasks)
     - Ask how they FEEL about their progress (emotional check-in)
-    - If tasks were missed, ask why without judgment
-    - Suggest ONE easy win for tomorrow to build momentum
+    - If tasks were missed, ask why WITHOUT judgment
+    - Suggest ONE easy win for tomorrow
     - Remind them of their streak or points if relevant
+    - Make them feel proud, even on tough days
     
     GENERAL CONVERSATION:
     - Answer questions about their progress
     - Provide motivation when asked
     - Help them adjust plans if needed
-    - Be encouraging but honest
+    - Be their accountability partner
+    - Celebrate wins, no matter how small
+    - When they're struggling, validate their feelings first
     
-    STYLE: 
-    - Casual friend, not corporate coach
-    - Use "we" language (we're in this together)
-    - Ask ONE question at a time
-    - Keep responses to 2-3 sentences max
-    - Use emojis sparingly and naturally
+    Remember: You're not a robot, you're a supportive friend. Be human, be kind, be real.
     """
     return genai.GenerativeModel(
         model_name='gemini-2.0-flash-exp',
@@ -356,8 +374,8 @@ def get_conversation_agent():
 
 # --- 4. UI LAYOUT ---
 
-st.title("⚡ SEYAL: The Action Agent")
-st.caption("Your AI-Powered Action Partner with Smart Insights & Gamification")
+st.title("⚡ SEYAL: Your AI Action Partner")
+st.caption("Let's achieve your goals together, one conversation at a time")
 
 # Sidebar Stats
 st.sidebar.markdown("---")
@@ -378,11 +396,106 @@ if st.session_state.get("current_streak", 0) >= 7:
     st.sidebar.success("🔥 Week Warrior!")
 
 # Main Interface Tabs
-tab1, tab2, tab3, tab4 = st.tabs(["🗺️ PLAN", "⚡ ACTION", "🧠 REFLECT", "💬 CHAT"])
+tab1, tab2, tab3, tab4 = st.tabs(["💬 CHAT", "🗺️ PLAN", "⚡ ACTION", "🧠 REFLECT"])
 
-# --- TAB 1: PLANNER ---
+# --- TAB 1: CONVERSATIONAL CHAT (Now First!) ---
 with tab1:
-    st.subheader("Define Your Goal & Your Why")
+    st.subheader("💬 Talk to Seyal")
+    
+    # Quick action buttons
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("🌅 Morning Briefing", use_container_width=True):
+            st.session_state["quick_action"] = "morning"
+    with col2:
+        if st.button("🌙 Evening Check-in", use_container_width=True):
+            st.session_state["quick_action"] = "evening"
+    with col3:
+        if st.button("💪 Need Motivation", use_container_width=True):
+            st.session_state["quick_action"] = "motivation"
+    
+    st.markdown("---")
+    
+    # Display chat messages
+    chat_container = st.container()
+    
+    with chat_container:
+        if st.session_state.get("chat_messages"):
+            for msg in st.session_state["chat_messages"]:
+                if msg["role"] == "user":
+                    st.chat_message("user").write(msg["content"])
+                else:
+                    st.chat_message("assistant", avatar="⚡").write(msg["content"])
+        else:
+            # Welcome message
+            with st.chat_message("assistant", avatar="⚡"):
+                st.write("Hey there! I'm Seyal, your AI action partner. 👋")
+                st.write("I'm here to help you achieve your goals through daily action and support.")
+                st.write("What would you like to work on today?")
+    
+    # Handle quick actions
+    if st.session_state.get("quick_action"):
+        action = st.session_state["quick_action"]
+        
+        if action == "morning":
+            user_msg = "Give me my morning briefing for today"
+        elif action == "evening":
+            user_msg = "Let's do an evening reflection on my day"
+        elif action == "motivation":
+            user_msg = "I need some motivation right now"
+        
+        st.session_state["chat_messages"].append({"role": "user", "content": user_msg})
+        
+        with st.spinner("Seyal is thinking..."):
+            try:
+                conv_agent = get_conversation_agent()
+                context = memory.get_history_context()
+                
+                # Build conversation history
+                conv_history = ""
+                for msg in st.session_state["chat_messages"][-5:]:
+                    role = "User" if msg["role"] == "user" else "Seyal"
+                    conv_history += f"\n{role}: {msg['content']}\n"
+                
+                full_prompt = f"{context}\n\nRecent Conversation:\n{conv_history}\n\nRespond naturally to the user's latest message."
+                response = conv_agent.generate_content(full_prompt)
+                
+                st.session_state["chat_messages"].append({"role": "assistant", "content": response.text})
+                st.session_state["quick_action"] = None
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Error: {e}")
+                st.session_state["quick_action"] = None
+    
+    # Chat input
+    if prompt := st.chat_input("Type your message here..."):
+        # Add user message
+        st.session_state["chat_messages"].append({"role": "user", "content": prompt})
+        
+        with st.spinner("Seyal is thinking..."):
+            try:
+                conv_agent = get_conversation_agent()
+                context = memory.get_history_context()
+                
+                # Build conversation history
+                conv_history = ""
+                for msg in st.session_state["chat_messages"][-5:]:
+                    role = "User" if msg["role"] == "user" else "Seyal"
+                    conv_history += f"\n{role}: {msg['content']}\n"
+                
+                full_prompt = f"{context}\n\nRecent Conversation:\n{conv_history}\n\nRespond naturally and conversationally."
+                response = conv_agent.generate_content(full_prompt)
+                
+                st.session_state["chat_messages"].append({"role": "assistant", "content": response.text})
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+# --- TAB 2: PLANNER ---
+with tab2:
+    st.subheader("🎯 Let's Define Your Goal")
     
     col1, col2 = st.columns([1, 1])
     
@@ -402,15 +515,15 @@ with tab1:
             help="This helps Seyal motivate you when things get tough!"
         )
     
-    if st.button("Generate Roadmap", type="primary"):
+    if st.button("✨ Create My Roadmap", type="primary", use_container_width=True):
         if not user_goal:
-            st.error("Please enter a goal.")
+            st.error("Please tell me what goal you want to achieve!")
         else:
             # Save the why
             if user_why:
                 st.session_state["core_why"] = user_why
             
-            with st.spinner("Planner Agent is strategizing and saving milestones..."):
+            with st.spinner("Creating your personalized roadmap..."):
                 try:
                     planner = get_planner_agent()
                     chat = planner.start_chat(enable_automatic_function_calling=True)
@@ -420,32 +533,34 @@ with tab1:
                         prompt += f"\n\nThis matters to me because: {user_why}"
                     
                     response = chat.send_message(prompt)
-                    st.success("🎯 Roadmap created!")
-                    st.write(response.text)
+                    st.success("🎯 Your roadmap is ready!")
+                    st.info(response.text)
                 except Exception as e:
                     st.error(f"Error during planning: {e}")
 
     # Display Current Roadmap
     if st.session_state["roadmap"]:
-        st.markdown("### 📍 Current Milestones")
+        st.markdown("---")
+        st.markdown("### 📍 Your Roadmap")
         for i, m in enumerate(st.session_state["roadmap"]):
-            st.info(f"**Milestone {i+1}:** {m}")
+            st.success(f"**Step {i+1}:** {m}")
     
     # Display Why
     if st.session_state.get("core_why"):
+        st.markdown("---")
         st.markdown("### 💭 Your Why")
-        st.success(f"*\"{st.session_state['core_why']}\"*")
+        st.info(f"*\"{st.session_state['core_why']}\"*")
 
-# --- TAB 2: ACTION ---
-with tab2:
+# --- TAB 3: ACTION ---
+with tab3:
     col1, col2 = st.columns([1, 1])
     
     # Left: Task Generation
     with col1:
-        st.markdown("### 📋 Daily Tasks")
+        st.markdown("### 📋 Today's Tasks")
         
-        if st.button("🎯 Get Today's Tasks", type="primary"):
-            with st.spinner("Task Agent is breaking down the plan..."):
+        if st.button("🎯 Generate Tasks for Today", type="primary", use_container_width=True):
+            with st.spinner("Breaking down your plan into actionable tasks..."):
                 try:
                     task_agent = get_task_agent()
                     context = memory.get_history_context()
@@ -468,7 +583,8 @@ with tab2:
                     for i, task in enumerate(tasks):
                         st.session_state["task_status"][f"task_{i}"] = False
                     
-                    st.success("✅ Tasks generated!")
+                    st.success("✅ Your tasks are ready!")
+                    st.balloons()
                     
                     # Generate nudge for first task
                     if tasks and st.session_state.get("logs"):
@@ -482,7 +598,8 @@ with tab2:
         
         # Display tasks with checkboxes
         if st.session_state["tasks"]:
-            st.markdown("**Today's Tasks:**")
+            st.markdown("---")
+            st.markdown("**Check off as you complete:**")
             for i, task in enumerate(st.session_state["tasks"]):
                 task_key = f"task_{i}"
                 if task_key not in st.session_state["task_status"]:
@@ -498,27 +615,27 @@ with tab2:
             # Show incomplete tasks from yesterday
             if st.session_state.get("pending_tasks"):
                 st.markdown("---")
-                st.markdown("**⏰ Pending from Yesterday:**")
+                st.markdown("**⏰ Carried Over from Yesterday:**")
                 for task in st.session_state["pending_tasks"]:
                     st.warning(f"• {task}")
 
     # Right: Logging
     with col2:
-        st.markdown("### 📝 Log Progress")
+        st.markdown("### 📝 Log Your Day")
         log_input = st.text_area(
-            "What did you complete today? Any challenges?", 
+            "How did today go? What did you accomplish?", 
             key="daily_log_text",
             height=150,
-            placeholder="Share your progress, wins, and any obstacles you faced..."
+            placeholder="Share your wins, challenges, and how you're feeling..."
         )
         mood_input = st.select_slider(
-            "How are you feeling?", 
+            "How's your energy today?", 
             ["Drained", "Bored", "Neutral", "Good", "Energetic"]
         )
         
-        if st.button("💾 Log Update", type="primary"):
+        if st.button("💾 Save Progress", type="primary", use_container_width=True):
             if not log_input:
-                st.warning("Please enter your daily progress.")
+                st.warning("Tell me about your day first!")
             else:
                 # Get completed tasks
                 completed_tasks = [
@@ -541,17 +658,15 @@ with tab2:
                 # Show completion summary
                 if completed_tasks:
                     st.balloons()
-                    st.info(f"✅ Logged {len(completed_tasks)} completed task(s)")
+                    st.info(f"✅ You completed {len(completed_tasks)} task(s) today!")
                 
                 # Offer to reschedule incomplete tasks
                 if incomplete_tasks:
-                    st.warning(f"⏰ {len(incomplete_tasks)} task(s) not completed")
-                    st.info("💡 These will appear as pending tasks tomorrow")
+                    st.warning(f"⏰ {len(incomplete_tasks)} task(s) will carry over to tomorrow")
 
-# --- TAB 3: REFLECT ---
-with tab3:
-    st.subheader("📊 Day-by-Day Progress Analysis")
-    st.info("The Reflector Agent analyzes your **daily tasks, mood patterns, and progress** to provide actionable insights.")
+# --- TAB 4: REFLECT ---
+with tab4:
+    st.subheader("📊 Your Progress Insights")
     
     # Show what data is available
     total_logs = len(st.session_state["logs"])
@@ -565,159 +680,83 @@ with tab3:
             st.metric("✅ Tasks Done", total_completed)
         with col3:
             avg_tasks = total_completed / total_logs if total_logs > 0 else 0
-            st.metric("📈 Avg/Day", f"{avg_tasks:.1f}")
+            st.metric("📈 Daily Avg", f"{avg_tasks:.1f}")
         with col4:
-            st.metric("⚡ Points", st.session_state["seyal_points"])
+            st.metric("⚡ Total Points", st.session_state["seyal_points"])
         
         # Show recent activity preview
-        with st.expander("📋 Recent Activity Preview"):
-            for log in st.session_state["logs"][-3:]:
+        with st.expander("📋 Recent Activity"):
+            for log in reversed(st.session_state["logs"][-5:]):
                 st.markdown(f"**{log.get('date')}** - Mood: {log.get('mood')}")
                 completed = log.get('completed_tasks', [])
                 if completed:
-                    st.markdown(f"✅ Completed: {len(completed)} task(s)")
+                    st.markdown(f"✅ Completed {len(completed)} task(s)")
                     for task in completed:
                         st.markdown(f"  • {task}")
                 else:
-                    st.markdown("⚠️ No tasks marked complete")
+                    st.markdown("⚠️ No tasks completed")
+                st.markdown("---")
     
-    if st.button("🧠 Analyze My Progress", type="primary"):
-        if len(st.session_state["logs"]) == 0 and "User started" in st.session_state["long_term_summary"]:
-            st.warning("📝 Not enough data yet. Log at least one day of progress before getting insights!")
+    if st.button("🧠 Get My Progress Report", type="primary", use_container_width=True):
+        if len(st.session_state["logs"]) == 0:
+            st.warning("📝 Start logging your daily progress first! Head to the ACTION tab to get started.")
         else:
-            with st.spinner("🔍 Reflector Agent is analyzing your day-by-day progress..."):
+            with st.spinner("🔍 Analyzing your progress patterns..."):
                 try:
                     reflector = get_reflector_agent()
                     history_context = memory.get_history_context()
                     
-                    prompt = f"""Analyze this user's day-by-day progress and generate a comprehensive SEYAL Weekly Report.
+                    prompt = f"""Analyze this user's progress and provide insights:
 
 {history_context}
 
-Please provide a detailed analysis with:
+Create a warm, conversational progress report with:
 
-1. 🏆 **Daily Wins Recap**
-   - Go through each day and summarize what they accomplished
-   - Mention specific tasks completed
-   - Celebrate their progress
+1. 🏆 **Wins to Celebrate**
+   - What they've accomplished (be specific!)
+   - Progress toward their goal
+   - Consistency and dedication
 
-2. ⚠️ **Patterns & Insights Detected**
-   - How did their mood change day to day?
-   - Which days were most productive?
-   - Any concerning patterns or obstacles?
-   - Consistency in showing up?
+2. 📊 **Patterns I'm Seeing**
+   - Mood and energy trends
+   - Most productive days/times
+   - Any obstacles or challenges
+   - What's working well
 
-3. 🚀 **Strategic Next Steps**
-   - Based on their plan, what should they focus on next?
-   - How can they maintain or improve momentum?
-   - Specific actionable recommendations
-   - Connect to their core "why" for motivation
+3. 💪 **Let's Level Up**
+   - What to focus on next
+   - How to maintain momentum
+   - Specific suggestions
+   - Connection to their "why"
 
-Be encouraging, specific, and reference actual days and tasks!"""
+Write like you're talking to a friend - be encouraging, honest, and helpful!"""
                     
                     response = reflector.generate_content(prompt)
                     
                     st.markdown("---")
                     st.markdown("### 📊 Your SEYAL Progress Report")
-                    st.markdown(response.text)
+                    st.info(response.text)
                     
                 except Exception as e:
-                    st.error(f"❌ Error generating reflection: {str(e)}")
-                    with st.expander("🔍 Debug Information"):
-                        st.exception(e)
+                    st.error(f"❌ Error generating report: {str(e)}")
     
     elif total_logs == 0:
-        st.info("👋 Get started by creating a plan in the PLAN tab, then log your daily progress in the ACTION tab. Come back here to get insights!")
-
-# --- TAB 4: CHAT ---
-with tab4:
-    st.subheader("💬 Chat with Seyal")
-    st.caption("Have a conversation about your goals, progress, or get motivation!")
-    
-    # Morning/Evening Ritual Buttons
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🌅 Morning Briefing", type="secondary"):
-            st.session_state["chat_mode"] = "morning"
-    with col2:
-        if st.button("🌙 Evening Reflection", type="secondary"):
-            st.session_state["chat_mode"] = "evening"
-    
-    # Chat interface
-    chat_input = st.text_area(
-        "Message Seyal...",
-        placeholder="Ask me anything about your goals, progress, or just chat!",
-        height=100,
-        key="chat_input_box"
-    )
-    
-    if st.button("Send", type="primary") or st.session_state.get("chat_mode"):
-        mode = st.session_state.get("chat_mode", "general")
-        
-        # Prepare prompt based on mode
-        if mode == "morning":
-            user_message = "Give me a morning briefing for today."
-            st.session_state["chat_mode"] = None
-        elif mode == "evening":
-            user_message = "Help me reflect on today's progress."
-            st.session_state["chat_mode"] = None
-        else:
-            user_message = chat_input
-        
-        if user_message:
-            with st.spinner("Seyal is thinking..."):
-                try:
-                    conv_agent = get_conversation_agent()
-                    context = memory.get_history_context()
-                    
-                    # Add conversation history
-                    conv_history = ""
-                    if st.session_state.get("conversation_history"):
-                        conv_history = "\n## Recent Conversation:\n"
-                        for msg in st.session_state["conversation_history"][-3:]:
-                            conv_history += f"\nUser: {msg['user']}\nSeyal: {msg['seyal']}\n"
-                    
-                    full_prompt = f"{context}\n{conv_history}\n\nUser said: {user_message}"
-                    response = conv_agent.generate_content(full_prompt)
-                    
-                    # Save to conversation history
-                    st.session_state["conversation_history"].append({
-                        "user": user_message,
-                        "seyal": response.text,
-                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M")
-                    })
-                    
-                    # Display conversation
-                    st.markdown("---")
-                    st.markdown(f"**You:** {user_message}")
-                    st.markdown(f"**Seyal:** {response.text}")
-                    
-                except Exception as e:
-                    st.error(f"Error: {e}")
-    
-    # Show conversation history
-    if st.session_state.get("conversation_history"):
-        with st.expander("💬 Conversation History"):
-            for msg in reversed(st.session_state["conversation_history"][-10:]):
-                st.markdown(f"**[{msg['timestamp']}]**")
-                st.markdown(f"**You:** {msg['user']}")
-                st.markdown(f"**Seyal:** {msg['seyal']}")
-                st.markdown("---")
+        st.info("👋 Ready to start your journey? Head to the PLAN tab to set your goal, then log your daily progress in ACTION!")
 
 # --- DEBUG VIEW ---
-with st.expander("🔍 Internals (Memory State and Observability)"):
+with st.expander("🔍 System Internals"):
     st.json({
         "Roadmap": st.session_state["roadmap"],
         "Core Why": st.session_state.get("core_why", ""),
         "Current Tasks": st.session_state["tasks"],
         "Task Completion Status": st.session_state["task_status"],
         "Pending Tasks": st.session_state.get("pending_tasks", []),
-        "Recent Detailed Logs": st.session_state["logs"],
-        "Long Term Memory Summary": st.session_state["long_term_summary"],
+        "Recent Logs": st.session_state["logs"][-3:] if st.session_state["logs"] else [],
+        "Long Term Summary": st.session_state["long_term_summary"],
         "Seyal Points": st.session_state["seyal_points"],
         "Current Streak": st.session_state["current_streak"],
         "Last Log Date": st.session_state.get("last_log_date"),
-        "Conversation History Count": len(st.session_state.get("conversation_history", []))
+        "Chat Messages Count": len(st.session_state.get("chat_messages", []))
     })
 
 # Footer
