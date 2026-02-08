@@ -4,17 +4,6 @@ import json
 from datetime import datetime, timedelta
 import streamlit.components.v1 as components
 
-# Voice mode imports (wrapped in try-except for optional installation)
-try:
-    from audio_recorder_streamlit import audio_recorder
-    import speech_recognition as sr
-    from gtts import gTTS
-    import tempfile
-    import os
-    VOICE_AVAILABLE = True
-except ImportError:
-    VOICE_AVAILABLE = False
-
 # 1. Set the page title and the logo as the browser favicon
 st.set_page_config(
     page_title="Seyal",
@@ -23,7 +12,10 @@ st.set_page_config(
 )
 
 # 2. Display the logo at the top of the app or in the sidebar
-st.sidebar.image("logo.jpg", width=150)
+try:
+    st.sidebar.image("logo.jpg", width=150)
+except:
+    pass  # Logo file optional
 st.sidebar.title("Seyal")
 
 # --- PWA INJECTION CODE ---
@@ -362,82 +354,10 @@ def get_conversation_agent():
     )
 
 
-# --- 4. VOICE MODE FUNCTIONALITY ---
-
-def render_voice_assistant():
-    """Render voice assistant in sidebar."""
-    if not VOICE_AVAILABLE:
-        st.sidebar.warning("📦 Install voice packages:\n`pip install audio-recorder-streamlit SpeechRecognition gtts`")
-        return
-    
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("🎤 Voice Assistant")
-    
-    audio_bytes = audio_recorder(
-        text="Click to talk to Seyal",
-        recording_color="#e74c3c",
-        neutral_color="#3498db",
-        icon_name="microphone",
-        icon_size="2x",
-        pause_threshold=2.0,
-        sample_rate=41000
-    )
-    
-    if audio_bytes:
-        # Save audio to temp file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
-            f.write(audio_bytes)
-            audio_path = f.name
-        
-        # Convert speech to text
-        recognizer = sr.Recognizer()
-        with sr.AudioFile(audio_path) as source:
-            audio_data = recognizer.record(source)
-            try:
-                user_text = recognizer.recognize_google(audio_data)
-                st.sidebar.success(f"**You:** {user_text}")
-                
-                # Get conversation context
-                context = memory.get_history_context()
-                
-                # Get AI response
-                conv_agent = get_conversation_agent()
-                full_prompt = f"{context}\n\nUser said: {user_text}"
-                response = conv_agent.generate_content(full_prompt)
-                
-                st.sidebar.write(f"**Seyal:** {response.text}")
-                
-                # Save to conversation history
-                st.session_state["conversation_history"].append({
-                    "user": user_text,
-                    "seyal": response.text,
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M")
-                })
-                
-                # Convert response to speech
-                tts = gTTS(text=response.text, lang='en', slow=False)
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as audio_file:
-                    tts.save(audio_file.name)
-                    st.sidebar.audio(audio_file.name, format='audio/mp3')
-                
-                # Cleanup temp files
-                try:
-                    os.unlink(audio_path)
-                except:
-                    pass
-                    
-            except sr.UnknownValueError:
-                st.sidebar.error("🤔 Couldn't understand that. Please try again!")
-            except sr.RequestError as e:
-                st.sidebar.error(f"❌ Speech recognition error: {e}")
-            except Exception as e:
-                st.sidebar.error(f"❌ Error: {e}")
-
-
-# --- 5. UI LAYOUT ---
+# --- 4. UI LAYOUT ---
 
 st.title("⚡ SEYAL: The Action Agent")
-st.caption("Your AI-Powered Action Partner with Voice, Gamification & Smart Insights")
+st.caption("Your AI-Powered Action Partner with Smart Insights & Gamification")
 
 # Sidebar Stats
 st.sidebar.markdown("---")
@@ -456,9 +376,6 @@ if points >= 500:
     st.sidebar.success("⭐ Action Master!")
 if st.session_state.get("current_streak", 0) >= 7:
     st.sidebar.success("🔥 Week Warrior!")
-
-# Voice Assistant
-render_voice_assistant()
 
 # Main Interface Tabs
 tab1, tab2, tab3, tab4 = st.tabs(["🗺️ PLAN", "⚡ ACTION", "🧠 REFLECT", "💬 CHAT"])
