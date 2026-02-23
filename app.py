@@ -63,7 +63,7 @@ except Exception as e:
 
 def summarize_old_logs_llm(logs_to_compact):
     """Helper function to summarize old logs using a lightweight Gemini model."""
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.0-flash')
     log_text = json.dumps(logs_to_compact, indent=2)
     prompt = f"""
     Analyze these past daily logs. Summarize the user's progress, wins, and mood patterns 
@@ -225,7 +225,7 @@ class SeyalMemoryBank:
 
     def generate_contextual_nudge(self, task, user_recent_mood):
         """Creates a personalized nudge based on context."""
-        nudge_agent = genai.GenerativeModel('gemini-1.5-flash')
+        nudge_agent = genai.GenerativeModel('gemini-2.0-flash')
         
         prompt = f"""
         Generate a 1-sentence motivational nudge for this task: "{task}"
@@ -266,7 +266,7 @@ def get_planner_agent():
     Keep your response conversational, warm, and motivating like a supportive coach.
     """
     return genai.GenerativeModel(
-        model_name='gemini-1.5-flash',
+        model_name='gemini-2.0-flash',
         tools=[memory.update_roadmap], 
         system_instruction=system_instruction
     )
@@ -281,7 +281,7 @@ def get_task_agent():
     Make tasks specific, actionable, and achievable in one day.
     """
     return genai.GenerativeModel(
-        model_name='gemini-1.5-flash',
+        model_name='gemini-2.0-flash',
         system_instruction=system_instruction
     )
 
@@ -321,7 +321,7 @@ def get_reflector_agent():
     Write in a warm, conversational tone like a supportive friend.
     """
     return genai.GenerativeModel(
-        model_name='gemini-1.5-flash',
+        model_name='gemini-2.0-flash',
         system_instruction=system_instruction
     )
 
@@ -367,7 +367,7 @@ def get_conversation_agent():
     Remember: You're not a robot, you're a supportive friend. Be human, be kind, be real.
     """
     return genai.GenerativeModel(
-        model_name='gemini-1.5-flash',
+        model_name='gemini-2.0-flash',
         system_instruction=system_instruction
     )
 
