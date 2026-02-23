@@ -743,21 +743,7 @@ Write like you're talking to a friend - be encouraging, honest, and helpful!"""
     elif total_logs == 0:
         st.info("👋 Ready to start your journey? Head to the PLAN tab to set your goal, then log your daily progress in ACTION!")
 
-# --- DEBUG VIEW ---
-with st.expander("🔍 System Internals"):
-    st.json({
-        "Roadmap": st.session_state["roadmap"],
-        "Core Why": st.session_state.get("core_why", ""),
-        "Current Tasks": st.session_state["tasks"],
-        "Task Completion Status": st.session_state["task_status"],
-        "Pending Tasks": st.session_state.get("pending_tasks", []),
-        "Recent Logs": st.session_state["logs"][-3:] if st.session_state["logs"] else [],
-        "Long Term Summary": st.session_state["long_term_summary"],
-        "Seyal Points": st.session_state["seyal_points"],
-        "Current Streak": st.session_state["current_streak"],
-        "Last Log Date": st.session_state.get("last_log_date"),
-        "Chat Messages Count": len(st.session_state.get("chat_messages", []))
-    })
+
 
 # Footer
 st.markdown("---")
